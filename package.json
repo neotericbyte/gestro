@@ -1,5 +1,5 @@
 {
-  "name": "gestro",
+  "name": "@neotericbyte/gestro",
   "version": "1.0.0",
   "description": "Minimal gesture engine for image pan, zoom, rotate and export",
   "main": "dist/gestro.umd.js",

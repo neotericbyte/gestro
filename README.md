@@ -25,7 +25,7 @@ Pan • Zoom • Rotate • Export — powered by pointer gestures.
 ## 📦 Installation
 
 ```bash
-npm install gestro
+npm install @neotericbyte/gestro
 ```
 
 ---
@@ -36,7 +36,7 @@ npm install gestro
 <gestro-image id="editor"></gestro-image>
 
 <script type="module">
-  import "gestro";
+  import "@neotericbyte/gestro";
 
   window.addEventListener("DOMContentLoaded", () => {
     const editor = document.getElementById("editor");
@@ -96,7 +96,7 @@ Returns PNG data URL of visible cropped area in original quality
 <gestro-image id="editor"></gestro-image>
 
 <script type="module">
-  import "gestro";
+  import "@neotericbyte/gestro";
 
   window.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById("editor");
@@ -121,7 +121,7 @@ Returns PNG data URL of visible cropped area in original quality
 
 ```jsx
 import { useEffect, useRef } from "react";
-import "gestro";
+import "@neotericbyte/gestro";
 
 export default function App() {
   const ref = useRef(null);
