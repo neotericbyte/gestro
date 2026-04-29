@@ -2,204 +2,210 @@
 <html>
 
 <head>
-    <title>Image Editor POC</title>
+	<title>Image Editor POC</title>
 
-    <!-- Mobile viewport -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <script src="gesture-image.js"></script>
+	<link rel="icon" href="data:,">
 
-    <style>
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+	<script src="gesture-image.js"></script>
 
-        html,
-        body {
-            margin: 0;
-            height: 100%;
-            font-family: system-ui, sans-serif;
-            background: #111;
-            color: #fff;
-            touch-action: manipulation;
-        }
+	<style>
+		* {
+			box-sizing: border-box;
+		}
 
-        .app {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
+		html,
+		body {
+			margin: 0;
+			height: 100%;
+			font-family: system-ui, sans-serif;
+			background: #111;
+			color: #fff;
+			touch-action: manipulation;
+		}
 
-        /* Header */
-        .header {
-            padding: 12px;
-            text-align: center;
-            font-weight: 600;
-            border-bottom: 1px solid #333;
-            background: #181818;
-        }
+		.app {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+		}
 
-        /* Editor Area */
-        .editor-container {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-        }
+		.header {
+			padding: 12px;
+			text-align: center;
+			border-bottom: 1px solid #333;
+			background: #181818;
+		}
 
-        gesture-image {
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 3 / 4;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #000;
-        }
+		.editor-container {
+			flex: 1;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			padding: 10px;
+		}
 
-        /* Controls */
-        .controls {
-            display: flex;
-            gap: 10px;
-            padding: 12px;
-            border-top: 1px solid #333;
-            background: #181818;
-        }
+		gesture-image {
+			width: 100%;
+			max-width: 400px;
+			aspect-ratio: 3 / 4;
+			border-radius: 12px;
+			overflow: hidden;
+			background: #000;
+			touch-action: none;
+		}
 
-        button,
-        label {
-            flex: 1;
-            padding: 12px;
-            border-radius: 10px;
-            border: none;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-align: center;
-        }
+		.controls {
+			display: flex;
+			gap: 10px;
+			padding: 12px;
+			background: #181818;
+		}
 
-        button {
-            background: #2a2a2a;
-            color: #fff;
-        }
+		button,
+		label {
+			flex: 1;
+			padding: 12px;
+			border-radius: 10px;
+			border: none;
+			font-size: 14px;
+			text-align: center;
+			cursor: pointer;
+		}
 
-        button:active {
-            transform: scale(0.96);
-        }
+		button {
+			background: #2a2a2a;
+			color: #fff;
+		}
 
-        .primary {
-            background: #4caf50;
-            color: #fff;
-        }
+		.primary {
+			background: #4caf50;
+		}
 
-        .upload {
-            background: #2196f3;
-            color: #fff;
-        }
+		.upload {
+			background: #2196f3;
+		}
 
-        input[type="file"] {
-            display: none;
-        }
+		input {
+			display: none;
+		}
 
-        /* Preview */
-        .preview {
-            padding: 10px;
-            text-align: center;
-        }
-
-        .preview img {
-            width: 120px;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-    </style>
+		.preview img {
+			width: 120px;
+			margin-top: 10px;
+		}
+	</style>
 </head>
 
 <body>
 
-    <div class="app">
+	<div class="app">
 
-        <div class="header">Image Editor POC</div>
+		<div class="header">Image Editor POC</div>
 
-        <div class="editor-container">
-            <gesture-image id="editor"></gesture-image>
-        </div>
+		<div class="editor-container">
+			<gesture-image id="editor"></gesture-image>
+		</div>
 
-        <div class="controls">
-            <label class="upload">
-                Upload
-                <input type="file" id="fileInput" accept="image/*">
-            </label>
+		<div class="controls">
+			<label class="upload">
+				Upload
+				<input type="file" id="fileInput" accept="image/*">
+			</label>
 
-            <button onclick="resetImage()">Reset</button>
+			<button onclick="resetImage()">Reset</button>
+			<button class="primary" onclick="exportImage()">Export</button>
+		</div>
 
-            <button class="primary" onclick="exportImage()">Export</button>
-        </div>
+		<div class="preview" id="preview"></div>
 
-        <div class="preview" id="preview"></div>
+	</div>
 
-    </div>
+	<script>
+		const editor = document.getElementById("editor");
+		const fileInput = document.getElementById("fileInput");
+		const preview = document.getElementById("preview");
 
-    <script>
-        const editor = document.getElementById("editor");
-        const fileInput = document.getElementById("fileInput");
-        const preview = document.getElementById("preview");
+		// Resize before load (important)
+		function resizeImage(file, maxSize = 1200) {
+			return new Promise((resolve) => {
+				const img = new Image();
+				const reader = new FileReader();
 
-        // Load default image
-        editor.setImage("https://picsum.photos/800/1200");
+				reader.onload = () => img.src = reader.result;
 
-        // Upload image
-        fileInput.addEventListener("change", (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+				img.onload = () => {
+					const canvas = document.createElement("canvas");
+					const ctx = canvas.getContext("2d");
 
-            const reader = new FileReader();
-            reader.onload = () => {
-                editor.setImage(reader.result);
-            };
-            reader.readAsDataURL(file);
-        });
+					let { width, height } = img;
 
-        // Reset
-        function resetImage() {
-            editor.setImage(editor.img?.src || "https://picsum.photos/800/1200");
-        }
+					if (width > height && width > maxSize) {
+						height *= maxSize / width;
+						width = maxSize;
+					} else if (height > maxSize) {
+						width *= maxSize / height;
+						height = maxSize;
+					}
 
-        // Export
-        async function exportImage() {
-            const data = await editor.exportImage();
+					canvas.width = width;
+					canvas.height = height;
 
-            preview.innerHTML = `
-    <div>Export Preview</div>
-    <img src="${data}" />
-  `;
-        }
+					ctx.drawImage(img, 0, 0, width, height);
+					resolve(canvas.toDataURL("image/jpeg", 0.9));
+				};
 
-        /* -------------------------
-           Zoom blockers (mobile)
-        -------------------------- */
+				reader.readAsDataURL(file);
+			});
+		}
 
-        // block pinch zoom
-        document.addEventListener('touchmove', function (e) {
-            if (e.scale !== 1) e.preventDefault();
-        }, { passive: false });
+		// Upload
+		fileInput.addEventListener("change", async (e) => {
+			const file = e.target.files[0];
+			if (!file) return;
 
-        // block double tap zoom
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (e) {
-            const now = Date.now();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
+			const resized = await resizeImage(file);
+			editor.setImage(resized);
 
-        // iOS Safari
-        document.addEventListener('gesturestart', e => e.preventDefault());
-        document.addEventListener('gesturechange', e => e.preventDefault());
-        document.addEventListener('gestureend', e => e.preventDefault());
-    </script>
+			fileInput.value = "";
+		});
+
+		// Reset
+		function resetImage() {
+			editor.setImage(editor.img?.src);
+		}
+
+		// Export
+		async function exportImage() {
+			const data = await editor.exportImage();
+
+			// create download link
+			const link = document.createElement("a");
+			link.href = data;
+			link.download = "edited-image.png"; // file name
+
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}
+
+		/* Zoom blockers (mobile) */
+		document.addEventListener('touchmove', e => {
+			if (e.scale !== 1) e.preventDefault();
+		}, { passive: false });
+
+		let lastTouchEnd = 0;
+		document.addEventListener('touchend', e => {
+			const now = Date.now();
+			if (now - lastTouchEnd <= 300) e.preventDefault();
+			lastTouchEnd = now;
+		}, false);
+
+		document.addEventListener('gesturestart', e => e.preventDefault());
+		document.addEventListener('gesturechange', e => e.preventDefault());
+		document.addEventListener('gestureend', e => e.preventDefault());
+	</script>
 
 </body>
 

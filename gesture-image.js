@@ -1,10 +1,10 @@
 class GestureImage extends HTMLElement {
-  constructor() {
-    super();
+	constructor() {
+		super();
 
-    this.attachShadow({ mode: "open" });
+		this.attachShadow({ mode: "open" });
 
-    this.shadowRoot.innerHTML = `
+		this.shadowRoot.innerHTML = `
       <style>
         :host {
           display: block;
@@ -29,6 +29,8 @@ class GestureImage extends HTMLElement {
           will-change: transform;
           max-width: none;
           max-height: none;
+          user-select: none;
+          pointer-events: none;
         }
       </style>
       <div class="container">
@@ -36,148 +38,224 @@ class GestureImage extends HTMLElement {
       </div>
     `;
 
-    this.container = this.shadowRoot.querySelector(".container");
-    this.img = this.shadowRoot.querySelector("img");
+		this.container = this.shadowRoot.querySelector(".container");
+		this.img = this.shadowRoot.querySelector("img");
 
-    this.pointers = new Map();
-    this.startDistance = 0;
-    this.startAngle = 0;
+		// gesture state
+		this.pointers = new Map();
+		this.startDistance = 0;
+		this.startAngle = 0;
 
-    this.baseScale = 1;
-    this.userScale = 1;
-    this.rotation = 0;
-    this.x = 0;
-    this.y = 0;
+		// transform state
+		this.baseScale = 1;
+		this.userScale = 1;
+		this.rotation = 0;
+		this.x = 0;
+		this.y = 0;
 
-    this._bindEvents();
-  }
+		this.minScale = 0.2;
+		this.maxScale = 5;
 
-  // -------- Public API --------
+		this._bindEvents();
+	}
 
-  setImage(src) {
-    const temp = new Image();
+	// =========================
+	// PUBLIC API
+	// =========================
 
-    temp.onload = () => {
-      this.img.src = src;
+	setImage(src) {
+		const temp = new Image();
 
-      requestAnimationFrame(() => {
-        this._applyCoverScale(temp.width, temp.height);
-      });
-    };
+		temp.onload = () => {
+			this.img.src = src;
 
-    temp.src = src;
-  }
+			requestAnimationFrame(() => {
+				this._applyCoverScale(temp.width, temp.height);
+			});
+		};
 
-  async exportImage() {
-    const img = new Image();
-    img.src = this.img.src;
-    await img.decode();
+		temp.src = src;
+	}
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+	async exportImage() {
+		const img = new Image();
+		img.src = this.img.src;
+		await img.decode();
 
-    canvas.width = img.width;
-    canvas.height = img.height;
+		const canvas = document.createElement("canvas");
+		const ctx = canvas.getContext("2d");
 
-    const finalScale = this.baseScale * this.userScale;
+		canvas.width = img.width;
+		canvas.height = img.height;
 
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(this.rotation * Math.PI / 180);
-    ctx.scale(finalScale, finalScale);
+		const finalScale = this.baseScale * this.userScale;
 
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+		ctx.translate(canvas.width / 2, canvas.height / 2);
+		ctx.rotate(this.rotation * Math.PI / 180);
+		ctx.scale(finalScale, finalScale);
 
-    return canvas.toDataURL("image/png");
-  }
+		ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-  // -------- Internal --------
+		return canvas.toDataURL("image/png");
+	}
 
-  _applyCoverScale(imgW, imgH) {
-    const rect = this.container.getBoundingClientRect();
+	// ---- External Controls ----
 
-    const scaleX = rect.width / imgW;
-    const scaleY = rect.height / imgH;
+	zoom(delta = 0.1) {
+		this.userScale += delta;
+		this._clampScale();
+		this._update();
+	}
 
-    this.baseScale = Math.max(scaleX, scaleY);
+	setZoom(scale) {
+		this.userScale = scale;
+		this._clampScale();
+		this._update();
+	}
 
-    this.userScale = 1;
-    this.rotation = 0;
-    this.x = 0;
-    this.y = 0;
+	rotate(deltaDeg = 10) {
+		this.rotation += deltaDeg;
+		this._normalizeRotation();
+		this._update();
+	}
 
-    this._update();
-  }
+	setRotation(deg) {
+		this.rotation = deg;
+		this._normalizeRotation();
+		this._update();
+	}
 
-  _bindEvents() {
-    this.container.onpointerdown = (e) => {
-      this.container.setPointerCapture(e.pointerId);
-      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+	resetTransform() {
+		this.userScale = 1;
+		this.rotation = 0;
+		this.x = 0;
+		this.y = 0;
+		this._update();
+	}
 
-      if (this.pointers.size === 2) {
-        const vals = Array.from(this.pointers.values());
-        this.startDistance = this._distance(vals[0], vals[1]);
-        this.startAngle = this._angle(vals[0], vals[1]);
-      }
-    };
+	center() {
+		this.x = 0;
+		this.y = 0;
+		this._update();
+	}
 
-    this.container.onpointermove = (e) => {
-      if (!this.pointers.has(e.pointerId)) return;
+	// =========================
+	// INTERNAL
+	// =========================
 
-      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+	_applyCoverScale(imgW, imgH) {
+		const rect = this.container.getBoundingClientRect();
 
-      // pan
-      if (this.pointers.size === 1) {
-        this.x += e.movementX;
-        this.y += e.movementY;
-      }
+		const scaleX = rect.width / imgW;
+		const scaleY = rect.height / imgH;
 
-      // pinch
-      if (this.pointers.size === 2) {
-        const vals = Array.from(this.pointers.values());
-        const a = vals[0];
-        const b = vals[1];
+		this.baseScale = Math.max(scaleX, scaleY);
 
-        const newDist = this._distance(a, b);
-        const scaleFactor = newDist / this.startDistance;
-        this.userScale *= scaleFactor;
+		this.userScale = 1;
+		this.rotation = 0;
+		this.x = 0;
+		this.y = 0;
 
-        const newAngle = this._angle(a, b);
-        this.rotation += (newAngle - this.startAngle);
+		this._update();
+	}
 
-        this.startDistance = newDist;
-        this.startAngle = newAngle;
-      }
+	_bindEvents() {
+		this.container.onpointerdown = (e) => {
+			this.container.setPointerCapture(e.pointerId);
 
-      requestAnimationFrame(() => this._update());
-    };
+			this.pointers.set(e.pointerId, {
+				x: e.clientX,
+				y: e.clientY,
+				prevX: e.clientX,
+				prevY: e.clientY
+			});
 
-    this.container.onpointerup = (e) => {
-      this.pointers.delete(e.pointerId);
-    };
+			if (this.pointers.size === 2) {
+				const vals = Array.from(this.pointers.values());
+				this.startDistance = this._distance(vals[0], vals[1]);
+				this.startAngle = this._angle(vals[0], vals[1]);
+			}
+		};
 
-    this.container.onpointercancel = (e) => {
-      this.pointers.delete(e.pointerId);
-    };
-  }
+		this.container.onpointermove = (e) => {
+			if (!this.pointers.has(e.pointerId)) return;
 
-  _update() {
-    const finalScale = this.baseScale * this.userScale;
+			const p = this.pointers.get(e.pointerId);
 
-    this.img.style.transform = `
+			const dx = e.clientX - p.prevX;
+			const dy = e.clientY - p.prevY;
+
+			p.prevX = e.clientX;
+			p.prevY = e.clientY;
+			p.x = e.clientX;
+			p.y = e.clientY;
+
+			this.pointers.set(e.pointerId, p);
+
+			// ✅ PAN (works after rotation)
+			if (this.pointers.size === 1) {
+				this.x += dx;
+				this.y += dy;
+			}
+
+			// ✅ PINCH + ROTATE
+			if (this.pointers.size === 2) {
+				const vals = Array.from(this.pointers.values());
+				const a = vals[0];
+				const b = vals[1];
+
+				const newDist = this._distance(a, b);
+				const scaleFactor = newDist / this.startDistance;
+				this.userScale *= scaleFactor;
+
+				this._clampScale();
+
+				const newAngle = this._angle(a, b);
+				this.rotation += (newAngle - this.startAngle);
+				this._normalizeRotation();
+
+				this.startDistance = newDist;
+				this.startAngle = newAngle;
+			}
+
+			requestAnimationFrame(() => this._update());
+		};
+
+		this.container.onpointerup = (e) => {
+			this.pointers.delete(e.pointerId);
+		};
+
+		this.container.onpointercancel = (e) => {
+			this.pointers.delete(e.pointerId);
+		};
+	}
+
+	_update() {
+		const finalScale = this.baseScale * this.userScale;
+
+		this.img.style.transform = `
       translate(-50%, -50%)
       scale(${finalScale})
       rotate(${this.rotation}deg)
       translate(${this.x}px, ${this.y}px)
     `;
-  }
+	}
 
-  _distance(a, b) {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
+	_clampScale() {
+		this.userScale = Math.max(this.minScale, Math.min(this.userScale, this.maxScale));
+	}
 
-  _angle(a, b) {
-    return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-  }
+	_normalizeRotation() {
+		this.rotation = this.rotation % 360;
+	}
+
+	_distance(a, b) {
+		return Math.hypot(b.x - a.x, b.y - a.y);
+	}
+
+	_angle(a, b) {
+		return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+	}
 }
 
 customElements.define("gesture-image", GestureImage);
