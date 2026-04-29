@@ -4,8 +4,20 @@
   "description": "Minimal gesture engine for image pan, zoom, rotate and export",
   "main": "dist/gestro.umd.js",
   "module": "dist/gestro.esm.js",
-  "types": "types/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/gestro.esm.js",
+      "require": "./dist/gestro.umd.js"
+    }
+  },
+  "types": "./types/index.d.ts",
+  "files": [
+    "dist",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "gesture",
     "image",
@@ -18,19 +30,6 @@
   ],
   "author": "Neoteric Byte",
   "license": "MIT",
-  "files": [
-    "dist",
-    "types",
-    "README.md",
-    "LICENSE"
-  ],
-  "exports": {
-    ".": {
-      "import": "./dist/gestro.esm.js",
-      "require": "./dist/gestro.umd.js",
-      "types": "./types/index.d.ts"
-    }
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/neotericbyte/gestro.git"

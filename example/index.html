@@ -6,9 +6,6 @@
 
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-	<!-- 👇 Use built file -->
-	<script type="module" src="../src/gestro-image.js"></script>
-
 	<style>
 		* {
 			box-sizing: border-box;
@@ -84,6 +81,71 @@
 			width: 100%;
 		}
 	</style>
+
+	<!-- ✅ IMPORTANT: module import -->
+	<script type="module">
+		import "../src/gestro-image.js";
+
+		// wait for DOM + element upgrade
+		window.addEventListener("DOMContentLoaded", () => {
+
+			const editor = document.getElementById("editor");
+			const fileInput = document.getElementById("fileInput");
+			const zoomSlider = document.getElementById("zoomSlider");
+			const rotateSlider = document.getElementById("rotateSlider");
+
+			// safe wait for custom element readiness
+			const init = () => {
+				if (!editor || typeof editor.setImage !== "function") {
+					requestAnimationFrame(init);
+					return;
+				}
+
+				editor.setImage("https://picsum.photos/800/1200");
+			};
+
+			init();
+
+			// Upload
+			fileInput.onchange = e => {
+				const file = e.target.files[0];
+				if (!file) return;
+
+				const reader = new FileReader();
+				reader.onload = () => editor.setImage(reader.result);
+				reader.readAsDataURL(file);
+
+				fileInput.value = "";
+			};
+
+			// Reset
+			window.reset = () => {
+				editor.resetTransform();
+				zoomSlider.value = 1;
+				rotateSlider.value = 0;
+			};
+
+			// Export
+			window.exportImage = async () => {
+				const data = await editor.exportImage();
+				const a = document.createElement("a");
+				a.href = data;
+				a.download = "gestro.png";
+				a.click();
+			};
+
+			// Zoom
+			zoomSlider.oninput = () => {
+				editor.setZoom(parseFloat(zoomSlider.value));
+			};
+
+			// Rotate
+			rotateSlider.oninput = () => {
+				editor.setRotation(parseFloat(rotateSlider.value));
+			};
+		});
+	</script>
+
 </head>
 
 <body>
@@ -111,43 +173,6 @@
 		</div>
 
 	</div>
-
-	<script>
-		const editor = document.getElementById("editor");
-
-		editor.setImage("https://picsum.photos/800/1200");
-
-		fileInput.onchange = e => {
-			const file = e.target.files[0];
-			if (!file) return;
-
-			const reader = new FileReader();
-			reader.onload = () => editor.setImage(reader.result);
-			reader.readAsDataURL(file);
-		};
-
-		function reset() {
-			editor.resetTransform();
-			zoomSlider.value = 1;
-			rotateSlider.value = 0;
-		}
-
-		async function exportImage() {
-			const data = await editor.exportImage();
-			const a = document.createElement("a");
-			a.href = data;
-			a.download = "gestro.png";
-			a.click();
-		}
-
-		zoomSlider.oninput = () => {
-			editor.setZoom(parseFloat(zoomSlider.value));
-		};
-
-		rotateSlider.oninput = () => {
-			editor.setRotation(parseFloat(rotateSlider.value));
-		};
-	</script>
 
 </body>
 
