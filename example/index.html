@@ -42,11 +42,17 @@
 			overflow: hidden;
 		}
 
+		/* =========================
+		   CONTROLS PANEL
+		========================= */
+
 		.controls {
-			padding: 12px;
+			padding: 14px;
 			display: flex;
 			flex-direction: column;
-			gap: 12px;
+			gap: 14px;
+			background: #161616;
+			border-top: 1px solid #2a2a2a;
 		}
 
 		.row {
@@ -63,6 +69,8 @@
 			background: #2a2a2a;
 			color: #fff;
 			cursor: pointer;
+			text-align: center;
+			font-size: 14px;
 		}
 
 		.primary {
@@ -71,23 +79,63 @@
 
 		.upload {
 			background: #2196f3;
-			text-align: center;
 		}
 
 		input[type="file"] {
 			display: none;
 		}
 
+		/* =========================
+		   SLIDER CARD
+		========================= */
+
+		.control-group {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			padding: 10px;
+			background: #1c1c1c;
+			border-radius: 12px;
+		}
+
+		.label {
+			display: flex;
+			justify-content: space-between;
+			font-size: 13px;
+			color: #bbb;
+		}
+
 		input[type="range"] {
+			-webkit-appearance: none;
 			width: 100%;
+			height: 6px;
+			border-radius: 999px;
+			background: #2b2b2b;
+			outline: none;
+		}
+
+		input[type="range"]::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			width: 18px;
+			height: 18px;
+			border-radius: 50%;
+			background: #4caf50;
+			cursor: pointer;
+			box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+		}
+
+		input[type="range"]::-moz-range-thumb {
+			width: 18px;
+			height: 18px;
+			border-radius: 50%;
+			background: #4caf50;
+			cursor: pointer;
 		}
 	</style>
 
-	<!-- ✅ IMPORTANT: module import -->
 	<script type="module">
 		import "../src/gestro-image.js";
 
-		// wait for DOM + element upgrade
 		window.addEventListener("DOMContentLoaded", () => {
 
 			const editor = document.getElementById("editor");
@@ -95,19 +143,19 @@
 			const zoomSlider = document.getElementById("zoomSlider");
 			const rotateSlider = document.getElementById("rotateSlider");
 
-			// safe wait for custom element readiness
+			const zoomValue = document.getElementById("zoomValue");
+			const rotateValue = document.getElementById("rotateValue");
+
 			const init = () => {
 				if (!editor || typeof editor.setImage !== "function") {
 					requestAnimationFrame(init);
 					return;
 				}
-
 				editor.setImage("https://picsum.photos/800/1200");
 			};
 
 			init();
 
-			// Upload
 			fileInput.onchange = e => {
 				const file = e.target.files[0];
 				if (!file) return;
@@ -119,14 +167,14 @@
 				fileInput.value = "";
 			};
 
-			// Reset
 			window.reset = () => {
 				editor.resetTransform();
 				zoomSlider.value = 1;
 				rotateSlider.value = 0;
+				zoomValue.textContent = "1.00x";
+				rotateValue.textContent = "0°";
 			};
 
-			// Export
 			window.exportImage = async () => {
 				const data = await editor.exportImage();
 				const a = document.createElement("a");
@@ -135,15 +183,18 @@
 				a.click();
 			};
 
-			// Zoom
 			zoomSlider.oninput = () => {
-				editor.setZoom(parseFloat(zoomSlider.value));
+				const val = parseFloat(zoomSlider.value);
+				editor.setZoom(val);
+				zoomValue.textContent = val.toFixed(2) + "x";
 			};
 
-			// Rotate
 			rotateSlider.oninput = () => {
-				editor.setRotation(parseFloat(rotateSlider.value));
+				const val = parseFloat(rotateSlider.value);
+				editor.setRotation(val);
+				rotateValue.textContent = val + "°";
 			};
+
 		});
 	</script>
 
@@ -161,15 +212,29 @@
 
 			<div class="row">
 				<label class="upload">
-					Upload
+					📤 Upload
 					<input type="file" id="fileInput" accept="image/*">
 				</label>
-				<button onclick="reset()">Reset</button>
-				<button class="primary" onclick="exportImage()">Export</button>
+
+				<button onclick="reset()">🔄 Reset</button>
+				<button class="primary" onclick="exportImage()">⬇️ Export</button>
 			</div>
 
-			<input type="range" id="zoomSlider" min="0.5" max="3" step="0.01" value="1">
-			<input type="range" id="rotateSlider" min="-180" max="180" step="1" value="0">
+			<div class="control-group">
+				<div class="label">
+					<span>🔍 Zoom</span>
+					<span id="zoomValue">1.00x</span>
+				</div>
+				<input type="range" id="zoomSlider" min="0.5" max="3" step="0.01" value="1">
+			</div>
+
+			<div class="control-group">
+				<div class="label">
+					<span>🔄 Rotate</span>
+					<span id="rotateValue">0°</span>
+				</div>
+				<input type="range" id="rotateSlider" min="-180" max="180" step="1" value="0">
+			</div>
 
 		</div>
 
