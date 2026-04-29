@@ -2,76 +2,190 @@
 <html>
 
 <head>
-    <title>Gesture Image Demo</title>
+    <title>Image Editor POC</title>
 
-    <!-- ✅ FIXED viewport -->
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Mobile viewport -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <!-- load your component -->
     <script src="gesture-image.js"></script>
 
     <style>
-        html, body {
-            margin: 0;
-            padding: 20px;
-            background: #222;
-            color: white;
-            font-family: sans-serif;
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-            /* ✅ IMPORTANT */
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            font-family: system-ui, sans-serif;
+            background: #111;
+            color: #fff;
             touch-action: manipulation;
         }
 
-        gesture-image {
-            width: 300px;
-            height: 400px;
-            border: 2px solid #555;
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
 
-            /* allow custom gestures inside */
-            touch-action: none;
+        /* Header */
+        .header {
+            padding: 12px;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 1px solid #333;
+            background: #181818;
+        }
+
+        /* Editor Area */
+        .editor-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        gesture-image {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 3 / 4;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            padding: 12px;
+            border-top: 1px solid #333;
+            background: #181818;
+        }
+
+        button,
+        label {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        button {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        .primary {
+            background: #4caf50;
+            color: #fff;
+        }
+
+        .upload {
+            background: #2196f3;
+            color: #fff;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Preview */
+        .preview {
+            padding: 10px;
+            text-align: center;
+        }
+
+        .preview img {
+            width: 120px;
+            border-radius: 8px;
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
 
-    <h3>Gesture Image Editor</h3>
+    <div class="app">
 
-    <gesture-image id="editor"></gesture-image>
+        <div class="header">Image Editor POC</div>
 
-    <br><br>
+        <div class="editor-container">
+            <gesture-image id="editor"></gesture-image>
+        </div>
 
-    <button onclick="loadImage()">Load Image</button>
-    <button onclick="exportImage()">Export</button>
+        <div class="controls">
+            <label class="upload">
+                Upload
+                <input type="file" id="fileInput" accept="image/*">
+            </label>
+
+            <button onclick="resetImage()">Reset</button>
+
+            <button class="primary" onclick="exportImage()">Export</button>
+        </div>
+
+        <div class="preview" id="preview"></div>
+
+    </div>
 
     <script>
         const editor = document.getElementById("editor");
+        const fileInput = document.getElementById("fileInput");
+        const preview = document.getElementById("preview");
 
-        function loadImage() {
-            editor.setImage("https://picsum.photos/800/1200");
+        // Load default image
+        editor.setImage("https://picsum.photos/800/1200");
+
+        // Upload image
+        fileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                editor.setImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Reset
+        function resetImage() {
+            editor.setImage(editor.img?.src || "https://picsum.photos/800/1200");
         }
 
+        // Export
         async function exportImage() {
             const data = await editor.exportImage();
-            console.log(data);
 
-            const img = document.createElement("img");
-            img.src = data;
-            img.style.width = "200px";
-            document.body.appendChild(img);
+            preview.innerHTML = `
+    <div>Export Preview</div>
+    <img src="${data}" />
+  `;
         }
 
-        // -------------------------------
-        // ✅ HARD BLOCK PAGE ZOOM (IMPORTANT)
-        // -------------------------------
+        /* -------------------------
+           Zoom blockers (mobile)
+        -------------------------- */
 
         // block pinch zoom
         document.addEventListener('touchmove', function (e) {
             if (e.scale !== 1) e.preventDefault();
         }, { passive: false });
 
-        // block double-tap zoom
+        // block double tap zoom
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function (e) {
             const now = Date.now();
@@ -81,7 +195,7 @@
             lastTouchEnd = now;
         }, false);
 
-        // iOS Safari fixes
+        // iOS Safari
         document.addEventListener('gesturestart', e => e.preventDefault());
         document.addEventListener('gesturechange', e => e.preventDefault());
         document.addEventListener('gestureend', e => e.preventDefault());
