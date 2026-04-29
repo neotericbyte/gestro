@@ -180,14 +180,11 @@
 		async function exportImage() {
 			const data = await editor.exportImage();
 
-			// create download link
 			const link = document.createElement("a");
 			link.href = data;
-			link.download = "edited-image.png"; // file name
+			link.download = `image-${Date.now()}.png`;
 
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
+			link.click(); // ✅ direct trigger
 		}
 
 		/* Zoom blockers (mobile) */

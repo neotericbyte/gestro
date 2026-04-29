@@ -234,11 +234,11 @@ class GestureImage extends HTMLElement {
 		const finalScale = this.baseScale * this.userScale;
 
 		this.img.style.transform = `
-      translate(-50%, -50%)
-      scale(${finalScale})
-      rotate(${this.rotation}deg)
-      translate(${this.x}px, ${this.y}px)
-    `;
+    translate(-50%, -50%)
+    translate(${this.x}px, ${this.y}px)
+    rotate(${this.rotation}deg)
+    scale(${finalScale})
+  `;
 	}
 
 	_clampScale() {
