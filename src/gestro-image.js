@@ -163,14 +163,14 @@ class GestroImage extends HTMLElement {
 	// PUBLIC API
 	// =========================
 
-	setZoom(scale) {
+	setScale(scale) {
 		this.userScale = scale;
 		this._clampScale();
 		this._requestUpdate();
 		this._emitTransform();
 	}
 
-	zoom(delta = 0.1) {
+	scale(delta = 0.1) {
 		this.userScale += delta;
 		this._clampScale();
 		this._requestUpdate();

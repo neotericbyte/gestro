@@ -1,7 +1,7 @@
 # Gestro
 
 **Minimal gesture engine for image transforms.**
-Pan • Zoom • Rotate • Export — powered by pointer gestures.
+Pan • Scale • Rotate • Export — powered by pointer gestures.
 
 ---
 
@@ -70,9 +70,9 @@ Always ensure the element is upgraded before calling APIs.
 ### Image
 - `setImage(src: string)`
 
-### Zoom
-- `zoom(delta?: number)`
-- `setZoom(scale: number)`
+### Scale
+- `scale(delta?: number)`
+- `setScale(scale: number)`
 
 ### Rotation
 - `rotate(deltaDeg?: number)`

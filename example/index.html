@@ -185,7 +185,7 @@
 
 			zoomSlider.oninput = () => {
 				const val = parseFloat(zoomSlider.value);
-				editor.setZoom(val);
+				editor.setScale(val);
 				zoomValue.textContent = val.toFixed(2) + "x";
 			};
 
