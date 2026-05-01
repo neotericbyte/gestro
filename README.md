@@ -7,7 +7,7 @@ Pan • Scale • Rotate • Export — powered by pointer gestures.
 
 ## 🔗 Live Demo
 
-👉 https://neotericbyte.github.io/gestro/example
+🚀 [Try Gestro](https://neotericbyte.github.io/gestro/)
 
 ---
 
