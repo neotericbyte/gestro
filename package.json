@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build:js": "esbuild src/gestro-image.js --bundle --format=esm --outfile=dist/gestro-image.esm.js",
+    "build:js": "node build.js",
     "build:example": "node scripts/build-example.mjs",
     "build": "npm run build:js && npm run build:example"
   },

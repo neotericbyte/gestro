@@ -2,15 +2,9 @@ import { build } from "esbuild";
 
 await build({
   entryPoints: ["src/gestro-image.js"],
-  outfile: "dist/gestro.esm.js",
+  outfile: "dist/gestro-image.esm.js",
   bundle: true,
-  format: "esm"
-});
-
-await build({
-  entryPoints: ["src/gestro-image.js"],
-  outfile: "dist/gestro.umd.js",
-  bundle: true,
-  format: "iife",
-  globalName: "Gestro"
+  format: "esm",
+  minify: true,
+  treeShaking: true,
 });
