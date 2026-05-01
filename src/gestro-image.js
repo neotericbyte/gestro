@@ -1,3 +1,5 @@
+import GestroEngine from "./gestro-engine.js";
+
 class GestroImage extends HTMLElement {
 	constructor() {
 		super();
@@ -33,6 +35,7 @@ class GestroImage extends HTMLElement {
           pointer-events: none;
         }
       </style>
+
       <div class="container">
         <img />
       </div>
@@ -40,11 +43,6 @@ class GestroImage extends HTMLElement {
 
 		this.container = this.shadowRoot.querySelector(".container");
 		this.img = this.shadowRoot.querySelector("img");
-
-		// gesture state
-		this.pointers = new Map();
-		this.startDistance = 0;
-		this.startAngle = 0;
 
 		// transform state
 		this.baseScale = 1;
@@ -56,11 +54,136 @@ class GestroImage extends HTMLElement {
 		this.minScale = 0.2;
 		this.maxScale = 5;
 
-		this._bindEvents();
+		// double tap state
+		this._lastTapTime = 0;
+		this._lastTapPos = null;
+		this._tapTimeout = 300;
+		this._tapMoveThreshold = 10;
+
+		this._initGestures();
+	}
+
+	// =========================
+	// GESTURES
+	// =========================
+
+	_initGestures() {
+		this.gesture = new GestroEngine(this.container, {
+			onPan: ({ dx, dy }) => {
+				this.x += dx;
+				this.y += dy;
+
+				const { maxX, maxY } = this._getBounds();
+
+				this.x = this._rubberBand(this.x, maxX);
+				this.y = this._rubberBand(this.y, maxY);
+
+				this._update();
+			},
+
+			onPinchRotate: ({ scaleFactor, rotationDelta }) => {
+				this.userScale *= scaleFactor;
+				this._clampScale();
+
+				this.rotation += rotationDelta;
+				this._normalizeRotation();
+
+				this._update();
+				this._emitTransform();
+			},
+
+			onEnd: (e) => {
+				// detect double tap only if no active pointers
+				if (this.gesture.pointers.size === 0) {
+					this._handleDoubleTap(e);
+				}
+
+				this._snapToBounds();
+			}
+		});
+	}
+
+	// =========================
+	// DOUBLE TAP
+	// =========================
+
+	_handleDoubleTap(e) {
+		const now = performance.now();
+		const x = e.clientX;
+		const y = e.clientY;
+
+		let isDoubleTap = false;
+
+		if (this._lastTapTime) {
+			const dt = now - this._lastTapTime;
+
+			if (dt < this._tapTimeout && this._lastTapPos) {
+				const dx = x - this._lastTapPos.x;
+				const dy = y - this._lastTapPos.y;
+
+				if (Math.hypot(dx, dy) < this._tapMoveThreshold) {
+					isDoubleTap = true;
+				}
+			}
+		}
+
+		this._lastTapTime = now;
+		this._lastTapPos = { x, y };
+
+		if (isDoubleTap) {
+			this.resetTransform();
+		}
 	}
 
 	// =========================
 	// PUBLIC API
+	// =========================
+
+	setZoom(scale) {
+		this.userScale = scale;
+		this._clampScale();
+		this._update();
+		this._emitTransform();
+	}
+
+	zoom(delta = 0.1) {
+		this.userScale += delta;
+		this._clampScale();
+		this._update();
+		this._emitTransform();
+	}
+
+	setRotation(deg) {
+		this.rotation = deg;
+		this._normalizeRotation();
+		this._update();
+		this._emitTransform();
+	}
+
+	rotate(delta = 10) {
+		this.rotation += delta;
+		this._normalizeRotation();
+		this._update();
+		this._emitTransform();
+	}
+
+	resetTransform() {
+		this.userScale = 1;
+		this.rotation = 0;
+		this.x = 0;
+		this.y = 0;
+		this._update();
+		this._emitTransform();
+	}
+
+	center() {
+		this.x = 0;
+		this.y = 0;
+		this._update();
+	}
+
+	// =========================
+	// IMAGE
 	// =========================
 
 	setImage(src) {
@@ -83,84 +206,30 @@ class GestroImage extends HTMLElement {
 		await img.decode();
 
 		const rect = this.container.getBoundingClientRect();
-
 		const finalScale = this.baseScale * this.userScale;
 
-		// 👇 how much the image is scaled on screen
 		const displayedWidth = img.width * finalScale;
 		const displayedHeight = img.height * finalScale;
 
-		// 👇 ratio from screen → original pixels
 		const ratioX = img.width / displayedWidth;
 		const ratioY = img.height / displayedHeight;
 
-		// 👇 export canvas in ORIGINAL quality
 		const canvas = document.createElement("canvas");
 		const ctx = canvas.getContext("2d");
 
 		canvas.width = rect.width * ratioX;
 		canvas.height = rect.height * ratioY;
 
-		// move to center
 		ctx.translate(canvas.width / 2, canvas.height / 2);
 
-		// apply same transform BUT scaled to original resolution
 		ctx.translate(this.x * ratioX, this.y * ratioY);
 		ctx.rotate(this.rotation * Math.PI / 180);
 		ctx.scale(finalScale * ratioX, finalScale * ratioY);
 
-		ctx.drawImage(
-			img,
-			-img.width / 2,
-			-img.height / 2
-		);
+		ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
 		return canvas.toDataURL("image/png");
 	}
-
-	// ---- External Controls ----
-
-	zoom(delta = 0.1) {
-		this.userScale += delta;
-		this._clampScale();
-		this._update();
-	}
-
-	setZoom(scale) {
-		this.userScale = scale;
-		this._clampScale();
-		this._update();
-	}
-
-	rotate(deltaDeg = 10) {
-		this.rotation += deltaDeg;
-		this._normalizeRotation();
-		this._update();
-	}
-
-	setRotation(deg) {
-		this.rotation = deg;
-		this._normalizeRotation();
-		this._update();
-	}
-
-	resetTransform() {
-		this.userScale = 1;
-		this.rotation = 0;
-		this.x = 0;
-		this.y = 0;
-		this._update();
-	}
-
-	center() {
-		this.x = 0;
-		this.y = 0;
-		this._update();
-	}
-
-	// =========================
-	// INTERNAL
-	// =========================
 
 	_applyCoverScale(imgW, imgH) {
 		const rect = this.container.getBoundingClientRect();
@@ -178,86 +247,98 @@ class GestroImage extends HTMLElement {
 		this._update();
 	}
 
-	_bindEvents() {
-		this.container.onpointerdown = (e) => {
-			this.container.setPointerCapture(e.pointerId);
+	// =========================
+	// BOUNDS + RUBBER BAND
+	// =========================
 
-			this.pointers.set(e.pointerId, {
-				x: e.clientX,
-				y: e.clientY,
-				prevX: e.clientX,
-				prevY: e.clientY
-			});
+	_getBounds() {
+		const rect = this.container.getBoundingClientRect();
+		const finalScale = this.baseScale * this.userScale;
 
-			if (this.pointers.size === 2) {
-				const vals = Array.from(this.pointers.values());
-				this.startDistance = this._distance(vals[0], vals[1]);
-				this.startAngle = this._angle(vals[0], vals[1]);
-			}
-		};
+		const imgW = this.img.naturalWidth * finalScale;
+		const imgH = this.img.naturalHeight * finalScale;
 
-		this.container.onpointermove = (e) => {
-			if (!this.pointers.has(e.pointerId)) return;
+		const maxX = Math.max(0, (imgW - rect.width) / 2);
+		const maxY = Math.max(0, (imgH - rect.height) / 2);
 
-			const p = this.pointers.get(e.pointerId);
-
-			const dx = e.clientX - p.prevX;
-			const dy = e.clientY - p.prevY;
-
-			p.prevX = e.clientX;
-			p.prevY = e.clientY;
-			p.x = e.clientX;
-			p.y = e.clientY;
-
-			this.pointers.set(e.pointerId, p);
-
-			// ✅ PAN (works after rotation)
-			if (this.pointers.size === 1) {
-				this.x += dx;
-				this.y += dy;
-			}
-
-			// ✅ PINCH + ROTATE
-			if (this.pointers.size === 2) {
-				const vals = Array.from(this.pointers.values());
-				const a = vals[0];
-				const b = vals[1];
-
-				const newDist = this._distance(a, b);
-				const scaleFactor = newDist / this.startDistance;
-				this.userScale *= scaleFactor;
-
-				this._clampScale();
-
-				const newAngle = this._angle(a, b);
-				this.rotation += (newAngle - this.startAngle);
-				this._normalizeRotation();
-
-				this.startDistance = newDist;
-				this.startAngle = newAngle;
-			}
-
-			requestAnimationFrame(() => this._update());
-		};
-
-		this.container.onpointerup = (e) => {
-			this.pointers.delete(e.pointerId);
-		};
-
-		this.container.onpointercancel = (e) => {
-			this.pointers.delete(e.pointerId);
-		};
+		return { maxX, maxY };
 	}
+
+	_rubberBand(value, limit) {
+		const abs = Math.abs(value);
+
+		if (abs <= limit) return value;
+
+		const excess = abs - limit;
+
+		const resistance = 0.35;
+
+		const reduced = limit + excess * resistance;
+
+		return value < 0 ? -reduced : reduced;
+	}
+
+	// =========================
+	// SNAP BACK
+	// =========================
+
+	_snapToBounds() {
+		const { maxX, maxY } = this._getBounds();
+
+		const clamp = (v, max) => Math.max(-max, Math.min(v, max));
+
+		const targetX = clamp(this.x, maxX);
+		const targetY = clamp(this.y, maxY);
+
+		if (targetX === this.x && targetY === this.y) return;
+
+		const startX = this.x;
+		const startY = this.y;
+
+		const duration = 300;
+		const startTime = performance.now();
+
+		const animate = (now) => {
+			const t = Math.min(1, (now - startTime) / duration);
+			const ease = 1 - Math.pow(1 - t, 3);
+
+			this.x = startX + (targetX - startX) * ease;
+			this.y = startY + (targetY - startY) * ease;
+
+			this._update();
+
+			if (t < 1) requestAnimationFrame(animate);
+		};
+
+		requestAnimationFrame(animate);
+	}
+
+	// =========================
+	// INTERNAL
+	// =========================
 
 	_update() {
 		const finalScale = this.baseScale * this.userScale;
 
 		this.img.style.transform = `
-    translate(-50%, -50%)
-    translate(${this.x}px, ${this.y}px)
-    rotate(${this.rotation}deg)
-    scale(${finalScale})
-  `;
+      translate(-50%, -50%)
+      translate(${this.x}px, ${this.y}px)
+      rotate(${this.rotation}deg)
+      scale(${finalScale})
+    `;
+	}
+
+	_emitTransform() {
+		this.dispatchEvent(
+			new CustomEvent("transform", {
+				detail: {
+					scale: this.userScale,
+					rotation: this.rotation,
+					x: this.x,
+					y: this.y
+				}
+			})
+		);
 	}
 
 	_clampScale() {
@@ -266,14 +347,6 @@ class GestroImage extends HTMLElement {
 
 	_normalizeRotation() {
 		this.rotation = this.rotation % 360;
-	}
-
-	_distance(a, b) {
-		return Math.hypot(b.x - a.x, b.y - a.y);
-	}
-
-	_angle(a, b) {
-		return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
 	}
 }
 
