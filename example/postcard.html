@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Gestro Multi Image Demo</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			margin: 0;
+			height: 100%;
+			font-family: system-ui, sans-serif;
+			background: #111;
+			color: #fff;
+		}
+
+		.app {
+			display: flex;
+			flex-direction: column;
+			height: 100vh;
+			overflow: hidden;
+		}
+
+		.grid {
+			flex: 0 0 auto;
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			grid-auto-rows: 1fr;
+			gap: 1px;
+			padding: 8px;
+			align-content: start;
+			max-width: 480px;
+			margin: 0 auto;
+			width: 100%;
+			border: 0.5px solid #2a2a2a;
+			border-radius: 12px;
+			background: #0a0a0a;
+			min-height: 400px;
+		}
+
+		.block {
+			display: flex;
+			flex-direction: column;
+			gap: 1px;
+			padding: 1px;
+			border: 1px solid #2a2a2a;
+			background: #151515;
+			cursor: pointer;
+		}
+
+		.block.active {
+			border-color: #4caf50;
+			box-shadow: 0 0 0 1px #4caf50;
+		}
+
+		.block:nth-child(4) {
+			grid-column: 1 / -1;
+		}
+
+		@media (min-width: 640px) {
+			.grid {
+				max-width: 600px;
+				min-height: 400px;
+			}
+		}
+
+		/* Remove rounded corners where images touch */
+		.block:nth-child(1) {
+			border-top-right-radius: 0;
+			border-bottom-right-radius: 0;
+			border-bottom-left-radius: 0;
+		}
+
+		.block:nth-child(2) {
+			border-bottom-left-radius: 0;
+			border-bottom-right-radius: 0;
+		}
+
+		.block:nth-child(3) {
+			border-top-left-radius: 0;
+			border-bottom-left-radius: 0;
+			border-bottom-right-radius: 0;
+		}
+
+		.block:nth-child(4) {
+			border-top-left-radius: 0;
+			border-top-right-radius: 0;
+		}
+
+		gestro-image {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+		}
+
+		.controls {
+			margin-top: 10px;
+			padding: 10px;
+			display: none;
+			flex-direction: column;
+			gap: 10px;
+			background: #161616;
+			border-top: 1px solid #2a2a2a;
+			flex: 1;
+			overflow-y: auto;
+		}
+
+		.controls.visible {
+			display: flex;
+		}
+
+		.controls-title {
+			font-size: 14px;
+			font-weight: 600;
+			opacity: 0.9;
+		}
+
+		.row {
+			display: flex;
+			gap: 10px;
+		}
+
+		button,
+		label {
+			flex: 1;
+			padding: 10px;
+			border-radius: 5px;
+			border: none;
+			background: #2a2a2a;
+			color: #fff;
+			cursor: pointer;
+			text-align: center;
+			font-size: 14px;
+		}
+
+		button:hover,
+		label:hover {
+			background: #333;
+		}
+
+		button:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+
+		.primary {
+			background: #4caf50;
+		}
+
+		.primary:hover {
+			background: #43a047;
+		}
+
+		.upload {
+			background: #2196f3;
+		}
+
+		.upload:hover {
+			background: #1e88e5;
+		}
+
+		input[type="file"] {
+			display: none;
+		}
+
+		.control-group {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			padding: 10px;
+			background: #181818;
+			border-radius: 5px;
+			border: 1px solid #2a2a2a;
+		}
+
+		.label {
+			display: flex;
+			justify-content: space-between;
+			font-size: 13px;
+		}
+
+		input[type="range"] {
+			width: 100%;
+			height: 4px;
+			border-radius: 999px;
+			background: linear-gradient(to right, #4caf50 var(--progress, 50%), #2b2b2b var(--progress, 50%));
+		}
+	</style>
+
+	<script type="module">
+		import "../src/gestro-image.js";
+
+		window.addEventListener("DOMContentLoaded", () => {
+			const blocks = Array.from(document.querySelectorAll(".block"));
+			const editors = blocks.map((block) => block.querySelector("gestro-image"));
+
+			const controls = document.getElementById("controls");
+			const controlsTitle = document.getElementById("controlsTitle");
+			const fileInput = document.getElementById("fileInput");
+			const zoomSlider = document.getElementById("zoomSlider");
+			const rotateSlider = document.getElementById("rotateSlider");
+			const zoomValue = document.getElementById("zoomValue");
+			const rotateValue = document.getElementById("rotateValue");
+			const undoBtn = document.getElementById("undoBtn");
+			const redoBtn = document.getElementById("redoBtn");
+			const resetBtn = document.getElementById("resetBtn");
+			const exportBtn = document.getElementById("exportBtn");
+
+			const state = new WeakMap();
+			let selectedEditor = null;
+
+			const updateSliderProgress = (slider) => {
+				const percent = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+				slider.style.setProperty("--progress", percent + "%");
+			};
+
+			const updateHistoryButtons = () => {
+				if (!selectedEditor) {
+					undoBtn.disabled = true;
+					redoBtn.disabled = true;
+					return;
+				}
+				undoBtn.disabled = selectedEditor._history.length <= 1;
+				redoBtn.disabled = selectedEditor._future.length === 0;
+			};
+
+			const applyUIFromState = (editor) => {
+				const s = state.get(editor) || { scale: 1, rotation: 0 };
+				zoomSlider.value = s.scale;
+				rotateSlider.value = s.rotation;
+				zoomValue.textContent = s.scale.toFixed(2) + "x";
+				rotateValue.textContent = s.rotation + "°";
+				updateSliderProgress(zoomSlider);
+				updateSliderProgress(rotateSlider);
+				updateHistoryButtons();
+			};
+
+			const selectEditor = (editor, label) => {
+				selectedEditor = editor;
+				blocks.forEach((block) => {
+					block.classList.toggle("active", block.querySelector("gestro-image") === editor);
+				});
+				controls.classList.add("visible");
+				controlsTitle.textContent = "Controls for " + label;
+				applyUIFromState(editor);
+			};
+
+			const initImage = (editor, src) => {
+				const ready = () => {
+					if (!editor || typeof editor.setImage !== "function") {
+						requestAnimationFrame(ready);
+						return;
+					}
+					editor.setImage(src);
+				};
+				ready();
+			};
+
+			const images = [
+				"https://picsum.photos/seed/gestro-1/800/1200",
+				"https://picsum.photos/seed/gestro-2/800/1200",
+				"https://picsum.photos/seed/gestro-3/800/1200",
+				"https://picsum.photos/seed/gestro-4/800/1200"
+			];
+
+			editors.forEach((editor, index) => {
+				state.set(editor, { scale: 1, rotation: 0 });
+				initImage(editor, images[index]);
+
+				editor.addEventListener("transform", (e) => {
+					state.set(editor, {
+						scale: e.detail.scale,
+						rotation: e.detail.rotation
+					});
+					if (selectedEditor === editor) {
+						applyUIFromState(editor);
+					}
+				});
+
+				blocks[index].addEventListener("click", () => {
+					selectEditor(editor, blocks[index].dataset.label);
+				});
+			});
+
+			zoomSlider.oninput = () => {
+				if (!selectedEditor) return;
+				selectedEditor.setScale(parseFloat(zoomSlider.value));
+			};
+
+			rotateSlider.oninput = () => {
+				if (!selectedEditor) return;
+				selectedEditor.setRotation(parseFloat(rotateSlider.value));
+			};
+
+			undoBtn.onclick = () => selectedEditor && selectedEditor.undo();
+			redoBtn.onclick = () => selectedEditor && selectedEditor.redo();
+			resetBtn.onclick = () => selectedEditor && selectedEditor.resetTransform();
+
+			exportBtn.onclick = async () => {
+				if (!selectedEditor) return;
+				const data = await selectedEditor.exportImage();
+				const a = document.createElement("a");
+				a.href = data;
+				a.download = "gestro-selected.png";
+				a.click();
+			};
+
+			fileInput.onchange = (e) => {
+				const file = e.target.files[0];
+				if (!file || !selectedEditor) return;
+
+				const reader = new FileReader();
+				reader.onload = () => selectedEditor.setImage(reader.result);
+				reader.readAsDataURL(file);
+				fileInput.value = "";
+			};
+
+			updateSliderProgress(zoomSlider);
+			updateSliderProgress(rotateSlider);
+			updateHistoryButtons();
+		});
+	</script>
+
+</head>
+
+<body>
+	<div class="app">
+		<div class="grid">
+			<div class="block" data-label="Image 1">
+				<gestro-image></gestro-image>
+			</div>
+			<div class="block" data-label="Image 2">
+				<gestro-image></gestro-image>
+			</div>
+			<div class="block" data-label="Image 3">
+				<gestro-image></gestro-image>
+			</div>
+			<div class="block" data-label="Image 4">
+				<gestro-image></gestro-image>
+			</div>
+		</div>
+
+		<div class="controls" id="controls">
+			<div class="controls-title" id="controlsTitle">Select an image to edit</div>
+
+			<div class="row">
+				<label class="upload">
+					📤 Upload
+					<input type="file" id="fileInput" accept="image/*">
+				</label>
+
+				<button id="resetBtn">🔄 Reset</button>
+			</div>
+
+			<div class="control-group">
+				<div class="label">
+					<span>🔍 Scale</span>
+					<span id="zoomValue">1.00x</span>
+				</div>
+				<input type="range" id="zoomSlider" min="0.5" max="3" step="0.01" value="1">
+			</div>
+
+			<div class="control-group">
+				<div class="label">
+					<span>🔄 Rotate</span>
+					<span id="rotateValue">0°</span>
+				</div>
+				<input type="range" id="rotateSlider" min="-180" max="180" step="1" value="0">
+			</div>
+		</div>
+	</div>
+</body>
+
+</html>
